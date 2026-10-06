@@ -79,6 +79,7 @@ th{font-weight:400;height:34px}td{height:34px;overflow:hidden;white-space:nowrap
 <div id="cam" hidden>
  <div class="bar"><input id="man" inputmode="numeric" placeholder="Or type the ISBN"><button id="go" class="pen">Look up</button><button id="x" class="alt">Cancel</button></div>
  <small style="color:#fff;text-align:center">Hold the barcode flat, about a hand's width away, and fill the box. Use the ISBN barcode on the back, not the price code.</small>
+ <div class="bar" id="ctl" hidden><input type="range" id="zm" aria-label="Zoom" style="padding:0;flex:1" hidden><button id="tq" class="alt" hidden>Light</button></div>
  <div id="reader"></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
@@ -165,7 +166,25 @@ $('#hist').onclick=e=>{
 
 // ---- barcode scan + lookup ----
 let sc;
-async function stopScan(){try{await sc.stop();sc.clear()}catch{}$('#cam').hidden=true}
+let busy=false;
+async function stopScan(){try{await sc.stop();sc.clear()}catch{}$('#cam').hidden=true;$('#ctl').hidden=true}
+// Only accept real book barcodes: 978/979 prefix with a valid check digit (ignores price codes and misreads)
+function okIsbn(t){
+ if(!/^97[89]\d{12}$/.test(t)&&!/^97[89]\d{10}$/.test(t))return false;
+ if(t.length!==13)return false;
+ const s=[...t.slice(0,12)].reduce((a,d,i)=>a+(+d)*(i%2?3:1),0);
+ return(10-s%10)%10===+t[12];
+}
+function setupCtl(){
+ try{
+  const c=sc.getRunningTrackCameraCapabilities(),z=c.zoomFeature(),t=c.torchFeature();
+  const zm=$('#zm'),tq=$('#tq');
+  zm.hidden=!z.isSupported();tq.hidden=!t.isSupported();
+  if(z.isSupported()){zm.min=z.min();zm.max=z.max();zm.step=z.step();zm.value=Math.min(z.max(),Math.max(z.min(),2));z.apply(+zm.value);zm.oninput=()=>z.apply(+zm.value)}
+  if(t.isSupported()){let on=false;tq.onclick=()=>{on=!on;t.apply(on);tq.textContent=on?'Light off':'Light'}}
+  $('#ctl').hidden=!(z.isSupported()||t.isSupported());
+ }catch{}
+}
 $('#x').onclick=stopScan;
 $('#scan').onclick=async()=>{
  $('#cam').hidden=false;
@@ -181,7 +200,8 @@ $('#scan').onclick=async()=>{
   if(camId)vc.deviceId={exact:camId};else vc.facingMode={ideal:'environment'};
   await sc.start(camId||{facingMode:'environment'},
   {fps:15,qrbox:(w,h)=>({width:Math.floor(w*.92),height:Math.floor(Math.min(h*.6,w*.5))}),videoConstraints:vc},
-  async t=>{await stopScan();lookup(t)},()=>{})}
+  async t=>{if(busy||!okIsbn(t))return;busy=true;navigator.vibrate?.(60);await stopScan();lookup(t)},()=>{});
+  busy=false;setupCtl()}
  catch{alert('Camera unavailable. Allow camera access and try again.');stopScan()}
 };
 $('#go').onclick=async()=>{
