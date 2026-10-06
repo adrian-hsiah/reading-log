@@ -33,18 +33,28 @@ main{width:100%}
 #cam{position:fixed;inset:0;background:#000;z-index:9;display:flex;flex-direction:column;justify-content:flex-start;gap:12px;padding:12px;overflow-y:auto}
 #cam[hidden]{display:none}
 #wrap{overflow-x:auto;margin-top:12px}
-.pg{min-width:760px;background:#fff;padding:16px;margin-bottom:16px;border:1px solid var(--line)}
-.hd{text-align:right;font-size:14px}.hd u{display:inline-block;min-width:140px;text-align:center}
-.pg h1{text-align:center;margin:4px 0 8px;font-size:26px}
+.pgo{margin-bottom:16px}
+.pg{min-width:820px;background:#fff;padding:12px;border:1px solid var(--line);color:#111}
+.hd{text-align:right;font-size:16px;font-weight:300;margin-right:2px}
+.hd u{display:inline-block;min-width:170px;text-align:center;text-decoration:none;border-bottom:1px solid #111;font-weight:400}
+.pg h1{text-align:center;margin:2px 0 8px;font:900 30px "Arial Rounded MT Bold","Avenir Next",system-ui,sans-serif;font-variant:small-caps;letter-spacing:1px}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
-th,td{border:1px solid #444;padding:2px 6px;font-size:14px}
-th{font-weight:400;height:34px}td{height:34px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+th,td{border:1px solid #222;padding:2px 8px;font-size:15px}
+th{font-weight:300;font-size:19px;height:40px;line-height:1.15}th.s{font-size:12px}
+td{height:40px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .c{text-align:center}
 [hidden]{display:none!important}
 @media print{
  .noprint{display:none!important}body{background:#fff}main{max-width:none;padding:0}
- #wrap{overflow:visible;margin:0}.pg{min-width:0;border:0;padding:0;margin:0;page-break-after:always}
- td,th{height:10mm}.pg h1{font-size:24px}@page{size:landscape;margin:10mm}
+ #wrap{overflow:visible;margin:0}.pgo{margin:0;page-break-after:always}.pg{min-width:0;border:0;padding:0}
+ td,th{height:10.4mm}th{font-size:14pt}th.s{font-size:10pt}td{font-size:11pt}
+ .pg h1{font-size:26pt;margin:1mm 0 3mm}.hd{font-size:12pt}
+ @page{size:landscape;margin:8mm}
+}
+/* If the phone ignores landscape and prints portrait, turn the sheet sideways to fill the page */
+@media print and (orientation:portrait){
+ .pgo{width:190mm;height:258mm;overflow:hidden}
+ .pg{width:258mm;height:190mm;transform-origin:0 0;transform:rotate(90deg) translateY(-100%)}
 }
 </style></head>
 <body><main>
@@ -228,10 +238,10 @@ function sheet(){
  for(let i=0;i<Math.max(es.length,1);i+=15){
   const rows=es.slice(i,i+15);
   while(rows.length<15)rows.push(null);
-  h+=`<div class="pg"><div class="hd">Name: <u>${esc(p.name)}</u> Student #: <u style="min-width:60px">${esc(p.no)}</u></div><h1>Daily Reading Log</h1>
-  <table><colgroup><col style="width:10%"><col style="width:38%"><col style="width:28%"><col style="width:11%"><col style="width:13%"></colgroup>
-  <tr><th>Date</th><th>Book Title</th><th>Author</th><th># of Minutes</th><th>Parent Initials</th></tr>
-  ${rows.map(r=>r?`<tr><td>${fmt(r.date)}</td><td>${esc(r.title)}</td><td>${esc(r.author)}</td><td class="c">${r.minutes}</td><td></td></tr>`:'<tr><td></td><td></td><td></td><td></td><td></td></tr>').join('')}</table></div>`;
+  h+=`<div class="pgo"><div class="pg"><div class="hd">Name: <u>${esc(p.name)}</u> Student #: <u style="min-width:70px">${esc(p.no)}</u></div><h1>Daily Reading Log</h1>
+  <table><colgroup><col style="width:10.5%"><col style="width:49.5%"><col style="width:24%"><col style="width:8.3%"><col style="width:7.7%"></colgroup>
+  <tr><th>Date</th><th>Book Title</th><th>Author</th><th class="s"># of<br>Minutes</th><th class="s">Parent<br>Initials</th></tr>
+  ${rows.map(r=>r?`<tr><td>${fmt(r.date)}</td><td>${esc(r.title)}</td><td>${esc(r.author)}</td><td class="c">${r.minutes}</td><td></td></tr>`:'<tr><td></td><td></td><td></td><td></td><td></td></tr>').join('')}</table></div></div>`;
  }
  $('#wrap').innerHTML=h;
 }
