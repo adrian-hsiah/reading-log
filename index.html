@@ -47,14 +47,14 @@ td{height:40px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 @media print{
  .noprint{display:none!important}body{background:#fff}main{max-width:none;padding:0}
  #wrap{overflow:visible;margin:0}.pgo{margin:0;page-break-after:always}.pg{min-width:0;border:0;padding:0}
- td,th{height:10.4mm}th{font-size:14pt}th.s{font-size:10pt}td{font-size:11pt}
- .pg h1{font-size:26pt;margin:1mm 0 3mm}.hd{font-size:12pt}
+ td,th{box-sizing:border-box;height:9.5mm;padding:0 2mm}th{font-size:14pt}th.s{font-size:10pt}td{font-size:11pt}
+ .pg h1{font-size:24pt;margin:0 0 2mm}.hd{font-size:12pt}
  @page{size:landscape;margin:8mm}
 }
 /* If the phone ignores landscape and prints portrait, turn the sheet sideways to fill the page */
 @media print and (orientation:portrait){
- .pgo{width:190mm;height:258mm;overflow:hidden}
- .pg{width:258mm;height:190mm;transform-origin:0 0;transform:rotate(90deg) translateY(-100%)}
+ .pgo{width:175mm;height:240mm;overflow:hidden}
+ .pg{width:240mm;height:175mm;transform-origin:0 0;transform:rotate(90deg) translateY(-100%)}
 }
 </style></head>
 <body><main>
