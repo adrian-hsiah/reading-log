@@ -23,6 +23,15 @@ input,select{min-width:0;max-width:100%}
 input[type=date]{-webkit-appearance:none;appearance:none;min-height:46px;text-align:left}
 .row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 #reader{width:100%}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px}
+#td{font:600 40px system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums;margin-bottom:8px}
+#tm .bar button,#ef .bar button{flex:1}
+#ed{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9;display:flex;padding:12px;overflow:auto}
+#ef{margin:auto;width:min(92vw,420px)}
+.ht{width:100%;border-collapse:collapse}
+.ht th,.ht td{border:0;border-bottom:1px solid var(--line);padding:8px 4px;font-size:15px;height:auto;white-space:normal;text-align:left;text-overflow:clip}
+.ht th{font-size:13px;color:var(--mut);height:auto}
+.ht button{padding:6px 10px}
 ul{list-style:none;padding:0;margin:16px 0}
 li{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
 li button{background:none;color:var(--mut);padding:4px 10px}
@@ -62,10 +71,12 @@ td{height:40px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
  <div class="bar"><select id="prof" aria-label="Child"></select>
  <button class="alt" id="edit" title="Edit">Edit</button><button class="alt" id="add" title="Add child">+ Child</button></div>
  <p id="empty" hidden>Add a child to start logging.</p>
- <nav id="nav"><button data-t="log" class="on">Log</button><button data-t="print">Print</button></nav>
+ <nav id="nav"><button data-t="log" class="on">Log</button><button data-t="hist">History</button><button data-t="print">Print</button></nav>
 </div>
 <div id="main" hidden>
  <section id="tlog" class="noprint">
+  <div class="card" id="tm"><div id="td">0:00</div>
+   <div class="bar"><button type="button" id="ts">Start</button><button type="button" class="alt" id="tu">Use time</button><button type="button" class="alt" id="tr">Reset</button></div></div>
   <form id="f">
    <button type="button" class="pen" id="scan">Scan book barcode</button>
    <input type="hidden" id="isbn">
@@ -76,8 +87,13 @@ td{height:40px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
     <label>Minutes<select id="min"></select></label>
    </div>
    <button>Save entry</button>
+   <small id="msg"></small>
   </form>
-  <ul id="hist"></ul>
+ </section>
+ <section id="thist" class="noprint" hidden>
+  <div class="bar"><button class="alt" id="hp" aria-label="Previous week">◀</button><div id="hl" style="flex:1;text-align:center;font-weight:600"></div><button class="alt" id="hn" aria-label="Next week">▶</button></div>
+  <p style="text-align:center;margin:8px 0"><button class="alt" id="ht">This week</button> <small id="hs"></small></p>
+  <table class="ht" id="htb"></table>
  </section>
  <section id="tprint" hidden>
   <div class="noprint bar"><label style="flex:1">Week containing<input type="date" id="wk"></label><button id="pr" style="align-self:end">Print / PDF</button></div>
@@ -86,6 +102,13 @@ td{height:40px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 </div>
 <p class="noprint"><button class="alt" id="bk">Backup</button> <small id="st"></small></p>
 </main>
+<div id="ed" hidden>
+ <form id="ef" class="card">
+  <label>Book title<input id="et" required></label>
+  <label>Author<input id="ea"></label>
+  <div class="row"><label>Date<input type="date" id="ed2" required></label><label>Minutes<input type="number" id="em" min="1" max="600" inputmode="numeric" required></label></div>
+  <div class="bar"><button>Save</button><button type="button" class="alt" id="edel">Delete</button><button type="button" class="alt" id="ecx">Cancel</button></div>
+ </form></div>
 <div id="cam" hidden>
  <div class="bar"><input id="man" inputmode="numeric" placeholder="Or type the ISBN"><button id="go" class="pen">Look up</button><button id="x" class="alt">Cancel</button></div>
  <small style="color:#fff;text-align:center">Hold the barcode flat, about a hand's width away, and fill the box. Use the ISBN barcode on the back, not the price code.</small>
@@ -147,7 +170,7 @@ async function checkRestore(){
 $('#bk').onclick=()=>CLIENT_ID&&tc?tc.requestAccessToken():alert('Backup is not set up yet. Add a Google client ID in index.html.');
 
 // ---- profiles ----
-$('#prof').onchange=e=>{db.activeId=e.target.value;save();render()};
+$('#prof').onchange=e=>{db.activeId=e.target.value;tUsed=false;save();render()};
 $('#add').onclick=()=>{
  const name=prompt('Child name');if(!name)return;
  const no=prompt('Student # (optional)')||'';
@@ -160,19 +183,83 @@ $('#edit').onclick=()=>{
 };
 
 // ---- entry form ----
-$('#min').innerHTML=Array.from({length:12},(_,i)=>(i+1)*15).map(m=>`<option ${m===30?'selected':''}>${m}</option>`).join('');
+const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+// Same child, same day, same book title (ignoring capitals/punctuation) -> one row with minutes added up
+function merged(es){const m=new Map();for(const e of es){const k=e.date+'|'+norm(e.title),x=m.get(k);if(x)x.minutes+=e.minutes;else m.set(k,{...e})}return[...m.values()]}
+function setMin(m){
+ const s=$('#min');s.querySelectorAll('.x').forEach(o=>o.remove());
+ if(![...s.options].some(o=>+o.value===m)){const o=new Option(m+' (timer)',m);o.className='x';s.add(o)}
+ s.value=m;
+}
+$('#min').innerHTML=Array.from({length:12},(_,i)=>`<option>${(i+1)*15}</option>`).join('');setMin(30);
 $('#date').value=iso(new Date());$('#wk').value=iso(new Date());
+let tUsed=false,mt,editId=null;
+function msg(t){const m=$('#msg');m.textContent=t;clearTimeout(mt);mt=setTimeout(()=>m.textContent='',4000)}
 $('#f').onsubmit=e=>{
  e.preventDefault();
- const isbn=$('#isbn').value,title=$('#title').value.trim(),author=$('#author').value.trim();
- db.entries.push({id:Date.now(),pid:db.activeId,date:$('#date').value,title,author,minutes:+$('#min').value,isbn});
+ const p=cur(),isbn=$('#isbn').value,title=$('#title').value.trim(),author=$('#author').value.trim(),date=$('#date').value,mins=+$('#min').value;
+ const ex=db.entries.find(x=>x.pid===p.id&&x.date===date&&norm(x.title)===norm(title));
+ if(ex){ex.minutes+=mins;if(!ex.author)ex.author=author;msg(`Added to today's entry: ${ex.minutes} min total`)}
+ else{db.entries.push({id:Date.now(),pid:p.id,date,title,author,minutes:mins,isbn});msg('Saved')}
  if(isbn)db.books[isbn]={title,author};
- $('#title').value=$('#author').value=$('#isbn').value='';
+ if(tUsed){p.timer={run:null,acc:0};tUsed=false}
+ $('#title').value=$('#author').value=$('#isbn').value='';setMin(30);
  save();render();
 };
-$('#hist').onclick=e=>{
- const id=e.target.dataset.del;
- if(id&&confirm('Delete this entry?')){db.entries=db.entries.filter(x=>x.id!=id);save();render()}
+
+// ---- timer (one per child; works from the clock, so it keeps counting while the phone sleeps) ----
+const tms=p=>p?(p.timer?.acc||0)+(p.timer?.run?Date.now()-p.timer.run:0):0;
+function tick(){
+ const p=cur();if(!p)return;
+ const s=Math.floor(tms(p)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),sec=s%60;
+ $('#td').textContent=(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(sec).padStart(2,'0');
+ $('#ts').textContent=p.timer?.run?'Pause':(s?'Resume':'Start');
+}
+setInterval(tick,1000);document.addEventListener('visibilitychange',tick);
+function pauseT(p){if(p.timer?.run){p.timer.acc+=Date.now()-p.timer.run;p.timer.run=null}}
+$('#ts').onclick=()=>{
+ const p=cur();p.timer=p.timer||{run:null,acc:0};
+ if(p.timer.run)pauseT(p);else p.timer.run=Date.now();
+ save();tick();
+};
+$('#tr').onclick=()=>{const p=cur();if(tms(p)&&!confirm('Reset the timer to 0?'))return;p.timer={run:null,acc:0};tUsed=false;save();tick()};
+$('#tu').onclick=()=>{
+ const p=cur();if(!p||!tms(p))return msg('Start the timer first.');
+ pauseT(p);
+ let m=Math.max(1,Math.round(tms(p)/60000));
+ if(m>180){const a=prompt(`Timer shows ${Math.floor(m/60)} h ${m%60} min. How many minutes should be logged?`,60);if(!a)return;m=Math.min(600,Math.max(1,Math.round(+a)||60))}
+ setMin(m);tUsed=true;save();tick();msg(`${m} min set. Pick the book, then tap Save.`);
+};
+
+// ---- history tab (one Mon-Sun week at a time; edit or delete entries) ----
+const addDays=(s,n)=>{const d=new Date(s+'T00:00');d.setDate(d.getDate()+n);return iso(d)};
+const monday=s=>addDays(s,-((new Date(s+'T00:00').getDay()+6)%7));
+let hw=monday(iso(new Date()));
+function hist(){
+ const p=cur();if(!p)return;
+ const end=addDays(hw,6);
+ $('#hl').textContent=fmt(hw)+' – '+fmt(end);
+ const es=db.entries.filter(e=>e.pid===p.id&&e.date>=hw&&e.date<=end).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+ $('#hs').textContent=es.length?es.reduce((a,e)=>a+e.minutes,0)+' min total':'';
+ $('#htb').innerHTML=es.length?'<tr><th>Date</th><th>Book</th><th>Min</th><th></th></tr>'+es.map(e=>`<tr><td>${fmt(e.date)}</td><td><b>${esc(e.title)}</b><br><small>${esc(e.author)}</small></td><td>${e.minutes}</td><td style="white-space:nowrap"><button class="alt" data-ed="${e.id}">Edit</button> <button class="alt" data-del="${e.id}" aria-label="Delete">✕</button></td></tr>`).join(''):'<tr><td><small>No entries this week.</small></td></tr>';
+}
+$('#hp').onclick=()=>{hw=addDays(hw,-7);hist()};
+$('#hn').onclick=()=>{hw=addDays(hw,7);hist()};
+$('#ht').onclick=()=>{hw=monday(iso(new Date()));hist()};
+$('#htb').onclick=e=>{
+ const t=e.target.closest('button');if(!t)return;
+ if(t.dataset.del&&confirm('Delete this entry?')){db.entries=db.entries.filter(x=>x.id!=t.dataset.del);save();render()}
+ if(t.dataset.ed){
+  const x=db.entries.find(y=>y.id==t.dataset.ed);editId=x.id;
+  $('#et').value=x.title;$('#ea').value=x.author;$('#ed2').value=x.date;$('#em').value=x.minutes;$('#ed').hidden=false;
+ }
+};
+$('#ecx').onclick=()=>$('#ed').hidden=true;
+$('#edel').onclick=()=>{if(confirm('Delete this entry?')){db.entries=db.entries.filter(x=>x.id!==editId);$('#ed').hidden=true;save();render()}};
+$('#ef').onsubmit=e=>{
+ e.preventDefault();const x=db.entries.find(y=>y.id===editId);if(!x)return;
+ x.title=$('#et').value.trim();x.author=$('#ea').value.trim();x.date=$('#ed2').value;x.minutes=Math.max(1,Math.round(+$('#em').value));
+ $('#ed').hidden=true;save();render();
 };
 
 // ---- barcode scan + lookup ----
@@ -234,7 +321,7 @@ function sheet(){
  const p=cur();if(!p)return;
  const d=new Date($('#wk').value+'T00:00');d.setDate(d.getDate()-(d.getDay()+6)%7);
  const a=iso(d);d.setDate(d.getDate()+6);const z=iso(d);
- const es=db.entries.filter(e=>e.pid===p.id&&e.date>=a&&e.date<=z).sort((x,y)=>x.date.localeCompare(y.date)||x.id-y.id);
+ const es=merged(db.entries.filter(e=>e.pid===p.id&&e.date>=a&&e.date<=z).sort((x,y)=>x.date.localeCompare(y.date)||x.id-y.id));
  window.lastRows=es;
  let h='';
  for(let i=0;i<Math.max(es.length,1);i+=15){
@@ -300,7 +387,7 @@ $('#pr').onclick=()=>{
 $('#nav').onclick=e=>{
  const t=e.target.dataset.t;if(!t)return;
  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b===e.target));
- $('#tlog').hidden=t!=='log';$('#tprint').hidden=t!=='print';if(t==='print')sheet();
+ $('#tlog').hidden=t!=='log';$('#thist').hidden=t!=='hist';$('#tprint').hidden=t!=='print';if(t==='print')sheet();if(t==='hist')hist();
 };
 
 // ---- render ----
@@ -308,9 +395,7 @@ function render(){
  $('#prof').innerHTML=db.profiles.map(p=>`<option value="${p.id}" ${p.id===db.activeId?'selected':''}>${esc(p.name)}</option>`).join('');
  const ok=!!cur();$('#main').hidden=!ok;$('#empty').hidden=ok;$('#nav').hidden=!ok;$('#edit').hidden=!ok;
  if(!ok)return;
- const es=db.entries.filter(e=>e.pid===db.activeId).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).slice(0,30);
- $('#hist').innerHTML=es.map(e=>`<li><div><b>${esc(e.title)}</b><br><small>${fmt(e.date)} · ${esc(e.author)} · ${e.minutes} min</small></div><button data-del="${e.id}" aria-label="Delete">✕</button></li>`).join('')||'<li><small>No entries yet.</small></li>';
- sheet();
+ hist();sheet();tick();
 }
 (async()=>{
  db=(await kv('get'))||db;render();
