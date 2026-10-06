@@ -170,9 +170,17 @@ $('#x').onclick=stopScan;
 $('#scan').onclick=async()=>{
  $('#cam').hidden=false;
  sc=new Html5Qrcode('reader',{formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13],useBarCodeDetectorIfSupported:true,verbose:false});
- try{await sc.start({facingMode:'environment'},
-  {fps:15,qrbox:(w,h)=>({width:Math.floor(w*.92),height:Math.floor(Math.min(h*.6,w*.5))}),
-   videoConstraints:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:'continuous'}]}},
+ try{
+  let camId=null;
+  try{
+   const cams=await Html5Qrcode.getCameras(),isBack=c=>/back|rear|environment/i.test(c.label);
+   const pick=cams.find(c=>/^back camera$/i.test(c.label))||cams.find(c=>isBack(c)&&!/ultra|tele|depth/i.test(c.label))||cams.find(isBack)||(cams.length>1?cams[cams.length-1]:cams[0]);
+   camId=pick?.id||null;
+  }catch{}
+  const vc={width:{ideal:1920},height:{ideal:1080}};
+  if(camId)vc.deviceId={exact:camId};else vc.facingMode={ideal:'environment'};
+  await sc.start(camId||{facingMode:'environment'},
+  {fps:15,qrbox:(w,h)=>({width:Math.floor(w*.92),height:Math.floor(Math.min(h*.6,w*.5))}),videoConstraints:vc},
   async t=>{await stopScan();lookup(t)},()=>{})}
  catch{alert('Camera unavailable. Allow camera access and try again.');stopScan()}
 };
