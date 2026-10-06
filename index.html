@@ -17,9 +17,12 @@ button.pen{background:var(--pen);color:var(--ink);font-weight:600}
 nav{display:flex;margin:12px 0;border-bottom:2px solid var(--line)}
 nav button{background:none;color:var(--mut);border-radius:0;flex:1;border-bottom:3px solid transparent;margin-bottom:-2px}
 nav button.on{color:var(--acc);border-color:var(--pen);font-weight:600}
-form{display:grid;gap:10px}
-label{font-size:14px;color:var(--mut);display:grid;gap:4px}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+form{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+label{font-size:14px;color:var(--mut);display:grid;grid-template-columns:minmax(0,1fr);gap:4px;min-width:0}
+input,select{min-width:0;max-width:100%}
+input[type=date]{-webkit-appearance:none;appearance:none;min-height:46px;text-align:left}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+#reader{width:100%}
 ul{list-style:none;padding:0;margin:16px 0}
 li{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
 li button{background:none;color:var(--mut);padding:4px 10px}
@@ -70,7 +73,10 @@ th{font-weight:400;height:34px}td{height:34px;overflow:hidden;white-space:nowrap
 </div>
 <p class="noprint"><button class="alt" id="bk">Backup</button> <small id="st"></small></p>
 </main>
-<div id="cam" hidden><div id="reader"></div><button id="x">Cancel</button></div>
+<div id="cam" hidden><div id="reader"></div>
+ <small style="color:#fff;text-align:center">Hold the barcode flat, about a hand's width away, and fill the box. Use the ISBN barcode on the back, not the price code.</small>
+ <div class="bar"><input id="man" inputmode="numeric" placeholder="Or type the ISBN"><button id="go" class="pen">Look up</button></div>
+ <button id="x">Cancel</button></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async onload="initAuth()"></script>
@@ -159,9 +165,18 @@ let sc;
 async function stopScan(){try{await sc.stop();sc.clear()}catch{}$('#cam').hidden=true}
 $('#x').onclick=stopScan;
 $('#scan').onclick=async()=>{
- $('#cam').hidden=false;sc=new Html5Qrcode('reader');
- try{await sc.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:140},formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13]},async t=>{await stopScan();lookup(t)},()=>{})}
+ $('#cam').hidden=false;
+ sc=new Html5Qrcode('reader',{formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13],useBarCodeDetectorIfSupported:true,verbose:false});
+ try{await sc.start({facingMode:'environment'},
+  {fps:15,qrbox:(w,h)=>({width:Math.floor(w*.92),height:Math.floor(Math.min(h*.6,w*.5))}),
+   videoConstraints:{width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:'continuous'}]}},
+  async t=>{await stopScan();lookup(t)},()=>{})}
  catch{alert('Camera unavailable. Allow camera access and try again.');stopScan()}
+};
+$('#go').onclick=async()=>{
+ const n=$('#man').value.replace(/\D/g,'');
+ if(n.length<10)return alert('Enter the 10 or 13 digit ISBN.');
+ await stopScan();$('#man').value='';lookup(n);
 };
 async function lookup(isbn){
  $('#isbn').value=isbn;let b=db.books[isbn];
