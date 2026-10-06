@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Reading Log</title>
 <style>
@@ -27,7 +27,10 @@ ul{list-style:none;padding:0;margin:16px 0}
 li{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
 li button{background:none;color:var(--mut);padding:4px 10px}
 small{color:var(--mut)}
-#cam{position:fixed;inset:0;background:#000;z-index:9;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:12px}
+html{-webkit-text-size-adjust:100%}
+html,body{max-width:100%;overflow-x:hidden}
+main{width:100%}
+#cam{position:fixed;inset:0;background:#000;z-index:9;display:flex;flex-direction:column;justify-content:flex-start;gap:12px;padding:12px;overflow-y:auto}
 #cam[hidden]{display:none}
 #wrap{overflow-x:auto;margin-top:12px}
 .pg{min-width:760px;background:#fff;padding:16px;margin-bottom:16px;border:1px solid var(--line)}
@@ -73,10 +76,10 @@ th{font-weight:400;height:34px}td{height:34px;overflow:hidden;white-space:nowrap
 </div>
 <p class="noprint"><button class="alt" id="bk">Backup</button> <small id="st"></small></p>
 </main>
-<div id="cam" hidden><div id="reader"></div>
+<div id="cam" hidden>
+ <div class="bar"><input id="man" inputmode="numeric" placeholder="Or type the ISBN"><button id="go" class="pen">Look up</button><button id="x" class="alt">Cancel</button></div>
  <small style="color:#fff;text-align:center">Hold the barcode flat, about a hand's width away, and fill the box. Use the ISBN barcode on the back, not the price code.</small>
- <div class="bar"><input id="man" inputmode="numeric" placeholder="Or type the ISBN"><button id="go" class="pen">Look up</button></div>
- <button id="x">Cancel</button></div>
+ <div id="reader"></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async onload="initAuth()"></script>
@@ -169,7 +172,7 @@ $('#scan').onclick=async()=>{
  sc=new Html5Qrcode('reader',{formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13],useBarCodeDetectorIfSupported:true,verbose:false});
  try{await sc.start({facingMode:'environment'},
   {fps:15,qrbox:(w,h)=>({width:Math.floor(w*.92),height:Math.floor(Math.min(h*.6,w*.5))}),
-   videoConstraints:{width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:'continuous'}]}},
+   videoConstraints:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:'continuous'}]}},
   async t=>{await stopScan();lookup(t)},()=>{})}
  catch{alert('Camera unavailable. Allow camera access and try again.');stopScan()}
 };
