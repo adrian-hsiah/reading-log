@@ -80,7 +80,7 @@ td{height:40px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   <ul id="hist"></ul>
  </section>
  <section id="tprint" hidden>
-  <div class="noprint bar"><label style="flex:1">Week containing<input type="date" id="wk"></label><button id="pr" style="align-self:end">Print</button></div>
+  <div class="noprint bar"><label style="flex:1">Week containing<input type="date" id="wk"></label><button id="pr" style="align-self:end">Print / PDF</button></div>
   <div id="wrap"></div>
  </section>
 </div>
@@ -93,6 +93,7 @@ td{height:40px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
  <div id="reader"></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async onload="initAuth()"></script>
 <script>
 // Paste your Google OAuth client ID here to turn on automatic Drive backup.
@@ -234,6 +235,7 @@ function sheet(){
  const d=new Date($('#wk').value+'T00:00');d.setDate(d.getDate()-(d.getDay()+6)%7);
  const a=iso(d);d.setDate(d.getDate()+6);const z=iso(d);
  const es=db.entries.filter(e=>e.pid===p.id&&e.date>=a&&e.date<=z).sort((x,y)=>x.date.localeCompare(y.date)||x.id-y.id);
+ window.lastRows=es;
  let h='';
  for(let i=0;i<Math.max(es.length,1);i+=15){
   const rows=es.slice(i,i+15);
@@ -245,7 +247,56 @@ function sheet(){
  }
  $('#wrap').innerHTML=h;
 }
-$('#wk').onchange=sheet;$('#pr').onclick=()=>print();
+// ---- landscape PDF (reliable on iPhone; browser printing ignores landscape) ----
+//PDF-START
+function buildPdf(J,p,es){
+ const d=new J({orientation:'landscape',unit:'mm',format:'letter'});
+ const x0=10,tw=259.4,xe=x0+tw,top=30,hh=12,rh=10.8;
+ const cw=[10.5,49.5,24,8.3,7.7].map(v=>tw*v/100),xs=[x0];
+ cw.forEach(w=>xs.push(xs[xs.length-1]+w));
+ const fit=(t,w)=>{t=String(t??'');if(d.getTextWidth(t)<=w-3)return t;while(t&&d.getTextWidth(t+'...')>w-3)t=t.slice(0,-1);return t+'...'};
+ for(let i=0;i<Math.max(es.length,1);i+=15){
+  if(i)d.addPage();
+  const rows=es.slice(i,i+15);
+  d.setDrawColor(30);d.setTextColor(20);d.setLineWidth(0.3);
+  // Name / Student # (top right)
+  d.setFont('helvetica','normal');d.setFontSize(12);
+  d.text('Student #:',xe-36,13,{align:'right'});d.line(xe-34,13.5,xe,13.5);d.text(String(p.no||''),xe-17,12.6,{align:'center'});
+  const ne=xe-36-d.getTextWidth('Student #:')-4;
+  d.text('Name:',ne-52,13,{align:'right'});d.line(ne-50,13.5,ne,13.5);d.text(String(p.name||''),ne-25,12.6,{align:'center'});
+  // Title
+  d.setFont('helvetica','bold');d.setFontSize(24);d.text('DAILY READING LOG',x0+tw/2,24,{align:'center'});
+  // Grid
+  const bottom=top+hh+15*rh;
+  for(let r=0;r<=16;r++){const y=r===0?top:r===1?top+hh:top+hh+(r-1)*rh;d.line(x0,y,xe,y)}
+  xs.forEach(x=>d.line(x,top,x,bottom));
+  // Header text
+  d.setFont('helvetica','normal');d.setFontSize(14);
+  ['Date','Book Title','Author'].forEach((t,c)=>d.text(t,(xs[c]+xs[c+1])/2,top+hh/2+1.8,{align:'center'}));
+  d.setFontSize(9);
+  [['# of','Minutes'],['Parent','Initials']].forEach((t,k)=>{const c=3+k,x=(xs[c]+xs[c+1])/2;d.text(t[0],x,top+hh/2-0.6,{align:'center'});d.text(t[1],x,top+hh/2+3.2,{align:'center'})});
+  // Rows
+  d.setFontSize(11);
+  rows.forEach((e,k)=>{
+   const y=top+hh+k*rh+rh/2+1.4;
+   d.text(fit(fmt(e.date),cw[0]),xs[0]+1.5,y);
+   d.text(fit(e.title,cw[1]),xs[1]+1.5,y);
+   d.text(fit(e.author,cw[2]),xs[2]+1.5,y);
+   d.text(String(e.minutes),(xs[3]+xs[4])/2,y,{align:'center'});
+  });
+ }
+ return d;
+}
+//PDF-END
+$('#wk').onchange=sheet;
+$('#pr').onclick=()=>{
+ const p=cur();if(!p)return;
+ const J=window.jspdf?.jsPDF;
+ if(!J)return print();
+ const d=buildPdf(J,p,window.lastRows||[]);
+ const w=window.open(d.output('bloburl'),'_blank');
+ if(!w)d.save('reading-log-'+p.name+'.pdf');
+};
 $('#nav').onclick=e=>{
  const t=e.target.dataset.t;if(!t)return;
  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b===e.target));
